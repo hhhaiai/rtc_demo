@@ -1,0 +1,281 @@
+# Phoenix RTC 生产环境 Docker Compose 配置
+# 包含高可用、负载均衡和监控
+
+version: '3.8'
+
+services:
+  # LiveKit 媒体服务器集群
+  livekit-1:
+    image: livekit/livekit-server:latest
+    container_name: phoenix_livekit_1
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "9000:9000"
+    environment:
+      - LIVEKIT_KEYS=devkey:secret
+      - LIVEKIT_REDIS_ADDRESS=redis:6379
+      - LIVEKIT_LOG_LEVEL=info
+    volumes:
+      - ./livekit-config.yaml:/config/livekit.yaml
+    depends_on:
+      - redis
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  livekit-2:
+    image: livekit/livekit-server:latest
+    container_name: phoenix_livekit_2
+    restart: unless-stopped
+    ports:
+      - "7882:7880"
+      - "7883:7881"
+      - "9001:9000"
+    environment:
+      - LIVEKIT_KEYS=devkey:secret
+      - LIVEKIT_REDIS_ADDRESS=redis:6379
+      - LIVEKIT_LOG_LEVEL=info
+    volumes:
+      - ./livekit-config.yaml:/config/livekit.yaml
+    depends_on:
+      - redis
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis 集群 (主从 + Sentinel)
+  redis:
+    image: redis:7-alpine
+    container_name: phoenix_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  # MySQL 8.0 主从配置
+  mysql:
+    image: mysql:8.0
+    container_name: phoenix_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=phoenix_rtc
+      - MYSQL_USER=phoenix
+      - MYSQL_PASSWORD=phoenix123
+      - MYSQL_INITDB_SKIP_DBGC=1
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./server/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=2G
+      - --innodb-log-file-size=256M
+      - --max-connections=200
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Nginx 负载均衡
+  nginx:
+    image: nginx:alpine
+    container_name: phoenix_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - backend-1
+      - backend-2
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Spring Boot 后端集群
+  backend-1:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: phoenix_backend_1
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phoenix_rtc?useSSL=true&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=phoenix
+      - SPRING_DATASOURCE_PASSWORD=phoenix123
+      - LIVEKIT_URL=ws://livekit-1:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - REDIS_PASSWORD=
+      - MYSQL_PASSWORD=phoenix123
+    depends_on:
+      - mysql
+      - redis
+      - livekit-1
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  backend-2:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: phoenix_backend_2
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phoenix_rtc?useSSL=true&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=phoenix
+      - SPRING_DATASOURCE_PASSWORD=phoenix123
+      - LIVEKIT_URL=ws://livekit-2:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - REDIS_PASSWORD=
+      - MYSQL_PASSWORD=phoenix123
+    depends_on:
+      - mysql
+      - redis
+      - livekit-2
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # 监控服务
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: phoenix_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: phoenix_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - rtc-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # 健康检查服务
+  health-checker:
+    image: alpine/curl:latest
+    container_name: phoenix_health
+    restart: unless-stopped
+    command: >
+      sh -c "
+        while true; do
+          echo 'Health Check - $(date)';
+          curl -s http://backend-1:8080/actuator/health || echo 'backend-1 DOWN';
+          curl -s http://backend-2:8080/actuator/health || echo 'backend-2 DOWN';
+          curl -s http://livekit-1:9000/health || echo 'livekit-1 DOWN';
+          curl -s http://livekit-2:9000/health || echo 'livekit-2 DOWN';
+          sleep 30;
+        done
+      "
+    networks:
+      - rtc-network
+    depends_on:
+      - backend-1
+      - backend-2
+
+volumes:
+  redis_data:
+    driver: local
+  mysql_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  rtc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

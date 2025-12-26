@@ -1,0 +1,102 @@
+# Phoenix RTC 开发环境
+# 包含: LiveKit, Redis, MySQL, Coturn (TURN Server)
+version: '3.8'
+
+services:
+  # LiveKit Media Server
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: phoenix_livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"   # WebSocket 端口
+      - "7881:7881"   # TCP 端口
+      - "7882:7882"   # UDP 端口范围起始
+      - "9000:9000"   # API 端口
+    environment:
+      - LIVEKIT_KEYS=devkey:secret
+      - LIVEKIT_CONFIG=/config/livekit.yaml
+    volumes:
+      - ./livekit-config.yaml:/config/livekit.yaml:ro
+    networks:
+      - phoenix-net
+    depends_on:
+      - redis
+
+  # Redis Cluster (缓存/会话)
+  redis:
+    image: redis:7-alpine
+    container_name: phoenix_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - phoenix-net
+
+  # MySQL 8.0 (持久化数据)
+  mysql:
+    image: mysql:8.0
+    container_name: phoenix_mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=phoenix_rtc
+      - MYSQL_USER=phoenix
+      - MYSQL_PASSWORD=phoenix123
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./server/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - phoenix-net
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Coturn TURN Server (NAT穿透)
+  coturn:
+    image: coturn/coturn:latest
+    container_name: phoenix_turn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "5349:5349/udp"
+    environment:
+      - TURN_REALM=phoenix-rtc
+      - TURN_USER=test:test123
+      - TURN_MIN_PORT=49152
+      - TURN_MAX_PORT=65535
+    networks:
+      - phoenix-net
+
+  # Spring Boot 应用 (待后续创建 Dockerfile 后启用)
+  # app:
+  #   build: ./server
+  #   container_name: phoenix_app
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - SPRING_REDIS_HOST=redis
+  #     - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phoenix_rtc
+  #     - LIVEKIT_URL=ws://livekit:7880
+  #     - LIVEKIT_API_KEY=devkey
+  #     - LIVEKIT_API_SECRET=secret
+  #   depends_on:
+  #     - redis
+  #     - mysql
+  #     - livekit
+  #   networks:
+  #     - phoenix-net
+
+volumes:
+  redis-data:
+  mysql-data:
+
+networks:
+  phoenix-net:
+    driver: bridge

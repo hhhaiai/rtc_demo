@@ -1,0 +1,81 @@
+# Phoenix RTC 应用配置
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  # 应用名称
+  application:
+    name: phoenix-rtc-server
+
+  # 数据源配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/phoenix_rtc?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: phoenix
+    password: phoenix123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA 配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+        use_sql_comments: true
+
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 2
+          max-wait: 5000ms
+
+  # WebSocket 配置
+  websocket:
+    stomp:
+      heartbeat:
+        send-interval: 10000
+        receive-interval: 10000
+
+# LiveKit 配置
+livekit:
+  url: ws://localhost:7880
+  api:
+    key: devkey
+    secret: secret
+
+# 日志配置
+logging:
+  level:
+    com.phoenix.rtc: DEBUG
+    org.springframework.web: INFO
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# 管理端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

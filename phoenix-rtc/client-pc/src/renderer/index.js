@@ -1,0 +1,12 @@
+/**
+ * Phoenix RTC Electron 渲染进程入口
+ */
+
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+
+root.render(React.createElement(App));

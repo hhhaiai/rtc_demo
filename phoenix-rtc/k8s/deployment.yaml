@@ -1,0 +1,373 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phoenix-rtc-server
+  labels:
+    app: phoenix-rtc
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: phoenix-rtc
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: phoenix-rtc
+        tier: backend
+    spec:
+      containers:
+      - name: app
+        image: phoenix-rtc-server:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_REDIS_HOST
+          value: "redis-service"
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:mysql://mysql-service:3306/phoenix_rtc"
+        - name: LIVEKIT_URL
+          value: "ws://livekit-service:7880"
+        - name: LIVEKIT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: api-key
+        - name: LIVEKIT_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: api-secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phoenix-rtc-service
+spec:
+  selector:
+    app: phoenix-rtc
+    tier: backend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-server
+  labels:
+    app: livekit
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: livekit
+  template:
+    metadata:
+      labels:
+        app: livekit
+    spec:
+      containers:
+      - name: livekit
+        image: livekit/livekit-server:latest
+        ports:
+        - containerPort: 7880
+        - containerPort: 9000
+        env:
+        - name: LIVEKIT_KEYS
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: keys
+        - name: LIVEKIT_REDIS_ADDRESS
+          value: "redis-service:6379"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        command: ["livekit-server", "--config", "/config/livekit.yaml"]
+      volumes:
+      - name: config
+        configMap:
+          name: livekit-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-service
+spec:
+  selector:
+    app: livekit
+  ports:
+  - name: websocket
+    protocol: TCP
+    port: 7880
+    targetPort: 7880
+  - name: api
+    protocol: TCP
+    port: 9000
+    targetPort: 9000
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server", "--appendonly", "yes"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+spec:
+  selector:
+    app: redis
+  ports:
+  - protocol: TCP
+    port: 6379
+    targetPort: 6379
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: root-password
+        - name: MYSQL_DATABASE
+          value: "phoenix_rtc"
+        - name: MYSQL_USER
+          value: "phoenix"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secrets
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: init-script
+        configMap:
+          name: mysql-init
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  selector:
+    app: mysql
+  ports:
+  - protocol: TCP
+    port: 3306
+    targetPort: 3306
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: livekit-secrets
+type: Opaque
+stringData:
+  api-key: "devkey"
+  api-secret: "secret"
+  keys: "devkey:secret"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secrets
+type: Opaque
+stringData:
+  root-password: "rootpassword"
+  password: "phoenix123"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: livekit-config
+data:
+  livekit.yaml: |
+    port: 7880
+    bind_addresses:
+      - "0.0.0.0"
+    api:
+      listen_port: 9000
+      key: devkey
+      secret: secret
+    redis:
+      address: redis-service:6379
+      db: 0
+    rtc:
+      tcp_port_range:
+        - 7881
+        - 7881
+      udp_port_range:
+        - 7882
+        - 8000
+    room:
+      empty_timeout: 300
+      max_participants: 100
+    webhook:
+      urls:
+        - "http://phoenix-rtc-service:8080/api/rtc/webhook"
+      api_key: "devkey"
+      api_secret: "secret"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+data:
+  schema.sql: |
+    CREATE TABLE IF NOT EXISTS rtc_session (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        room_name VARCHAR(64) NOT NULL UNIQUE,
+        room_title VARCHAR(128),
+        initiator_id VARCHAR(32) NOT NULL,
+        session_type TINYINT NOT NULL,
+        max_participants INT DEFAULT 100,
+        start_time DATETIME,
+        end_time DATETIME,
+        status TINYINT DEFAULT 0,
+        recording_enabled BOOLEAN DEFAULT FALSE,
+        recording_url VARCHAR(512),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_initiator (initiator_id),
+        INDEX idx_status (status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+    CREATE TABLE IF NOT EXISTS rtc_participant (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        session_id BIGINT NOT NULL,
+        user_id VARCHAR(32) NOT NULL,
+        user_name VARCHAR(64),
+        join_time DATETIME,
+        leave_time DATETIME,
+        role VARCHAR(16) DEFAULT 'publisher',
+        duration INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_session (session_id),
+        INDEX idx_user (user_id),
+        FOREIGN KEY (session_id) REFERENCES rtc_session(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+    CREATE TABLE IF NOT EXISTS rtc_recording (
+        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+        session_id BIGINT NOT NULL,
+        file_url VARCHAR(512) NOT NULL,
+        file_size BIGINT,
+        duration INT,
+        format VARCHAR(16) DEFAULT 'mp4',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_session (session_id),
+        FOREIGN KEY (session_id) REFERENCES rtc_session(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

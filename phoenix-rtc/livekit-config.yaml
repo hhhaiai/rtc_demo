@@ -1,0 +1,77 @@
+# LiveKit Server 配置文件
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+
+# API 配置
+api:
+  listen_port: 9000
+  key: devkey
+  secret: secret
+
+# Redis 配置 (用于分布式)
+redis:
+  address: redis:6379
+  # password: ""  # 如果有密码
+  db: 0
+
+# RTC 配置
+rtc:
+  # TCP 端口范围 (用于 NAT 穿透失败时的回退)
+  tcp_port_range:
+    - 7881
+    - 7881
+
+  # UDP 端口范围 (媒体流传输)
+  udp_port_range:
+    - 7882
+    - 8000
+
+  # ICE 服务器配置
+  ice_servers:
+    - urls:
+        - "stun:stun.l.google.com:19302"
+    - urls:
+        - "turn:localhost:3478"
+      username: "test"
+      credential: "test123"
+
+# 日志配置
+logging:
+  level: info
+  json: false
+
+# 节点配置
+node:
+  # 主机名，用于集群发现
+  hostname: "livekit-node-1"
+
+# Webhook 配置
+webhook:
+  # 回调地址 (Spring Boot 服务)
+  urls:
+    - "http://host.docker.internal:8080/api/rtc/webhook"
+  # API 密钥 (用于验证 webhook 签名)
+  api_key: "devkey"
+  api_secret: "secret"
+
+# 录制配置 (Egress)
+egress:
+  # Redis 用于 egress 协调
+  redis_address: redis:6379
+
+# 房间配置
+room:
+  # 自动销毁空房间 (秒)
+  empty_timeout: 300
+  # 最大参与者数量
+  max_participants: 100
+  # 启用录音
+  enable_recording: true
+
+# 负载均衡配置
+load_balancer:
+  # 启用负载均衡
+  enabled: false
+  # 区域
+  region: "default"
