@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1. 视频通话 - 简化版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 22px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info-box strong { color: #1976d2; }
+
+        .step-box {
+            background: #fff3cd;
+            padding: 15px 20px;
+            margin: 10px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            font-size: 13px;
+        }
+        .step-box .step {
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+        }
+
+        .login-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .login-form {
+            display: flex;
+            gap: 10px;
+            max-width: 700px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .login-form input {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-form button {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn-connect {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-connect:hover:not(:disabled) {
+            background: #388e3c;
+            transform: translateY(-2px);
+        }
+        .btn-disconnect {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-disconnect:hover:not(:disabled) {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .status {
+            padding: 10px 20px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            margin: 10px 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+            text-align: center;
+        }
+        .status.active { display: block; }
+        .status.success { background: #d1e7dd; border-left-color: #28a745; }
+        .status.error { background: #f8d7da; border-left-color: #dc3545; }
+        .status.info { background: #e3f2fd; border-left-color: #2196f3; }
+
+        .controls {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            display: none;
+        }
+        .controls.active {
+            display: block;
+        }
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover:not(:disabled) { background: #e0a800; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #0056b3; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover:not(:disabled) { background: #218838; }
+
+        .video-grid {
+            display: grid;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 300px;
+        }
+        .video-grid.two-columns {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 2;
+        }
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.9);
+        }
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.9);
+        }
+        .connection-status.connecting {
+            background: rgba(255, 193, 7, 0.9);
+        }
+
+        .signal-section {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: none;
+        }
+        .signal-section.active {
+            display: block;
+        }
+        .signal-box {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .signal-box textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .signal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            flex-wrap: wrap;
+            display: none;
+        }
+        .stats.active {
+            display: flex;
+        }
+        .stat-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .stat-value {
+            font-weight: 700;
+            color: #007bff;
+            margin-left: 5px;
+        }
+
+        .auto-mode {
+            background: #d1e7dd;
+            padding: 12px 20px;
+            margin: 10px 20px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+            font-size: 13px;
+            font-weight: 600;
+            color: #155724;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📹 1. 视频通话 - 简化版</h1>
+            <p>自动信令交换，一键复制，超简单！</p>
+        </div>
+
+        <div class="info-box">
+            <strong>使用说明：</strong><br>
+            • 本页面使用 WebRTC P2P 技术建立真实连接<br>
+            • <strong>简化版：</strong> 一键复制信令，无需手动输入<br>
+            • 两个浏览器打开此页面即可测试
+        </div>
+
+        <div class="step-box">
+            <div class="step"><strong>步骤1：</strong> 输入用户名 → 点击"开始通话"</div>
+            <div class="step"><strong>步骤2：</strong> 点击"创建连接" → 自动生成信令 → 点击"复制"</div>
+            <div class="step"><strong>步骤3：</strong> 将信令发给对方 → 对方粘贴后点击"加入通话"</div>
+            <div class="step"><strong>步骤4：</strong> 对方生成应答 → 复制发回给您 → 您粘贴后点击"完成"</div>
+        </div>
+
+        <div class="auto-mode">
+            💡 提示：点击按钮后会自动复制到剪贴板，无需手动选择
+        </div>
+
+        <div class="login-section">
+            <div class="login-form">
+                <input type="text" id="usernameInput" placeholder="您的用户名 (例如: userA)" maxlength="20">
+                <button class="btn-connect" id="connectBtn" onclick="initConnection()">开始通话</button>
+                <button class="btn-disconnect" id="disconnectBtn" onclick="disconnect()" disabled>断开连接</button>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="controls" id="controls">
+            <div class="control-group">
+                <button class="btn btn-secondary" id="toggleAudioBtn" onclick="toggleAudio()">🔇 静音</button>
+                <button class="btn btn-secondary" id="toggleVideoBtn" onclick="toggleVideo()">📷 关闭摄像头</button>
+            </div>
+        </div>
+
+        <div class="video-grid" id="videoGrid">
+            <div class="video-container">
+                <div class="video-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);color:white;font-size:16px;font-weight:600;flex-direction:column;gap:8px;">
+                    <div style="font-size:42px;">👤</div>
+                    <div>等待初始化...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-item">连接状态: <span class="stat-value" id="connState">-</span></div>
+            <div class="stat-item">ICE状态: <span class="stat-value" id="iceState">-</span></div>
+            <div class="stat-item">带宽: <span class="stat-value" id="bandwidth">-</span></div>
+        </div>
+
+        <div class="signal-section" id="signalSection">
+            <!-- 步骤1: 创建Offer -->
+            <div class="signal-box" id="step1Box">
+                <strong>步骤 1: 创建连接 (A方操作)</strong><br>
+                <small>点击后会自动复制信令，发给B方</small><br>
+                <textarea id="offerTextarea" placeholder="点击下方按钮生成信令"></textarea>
+                <div class="signal-buttons">
+                    <button class="btn btn-primary btn-small" onclick="createOffer()">🎯 创建连接</button>
+                    <button class="btn btn-success btn-small" onclick="copySignal('offerTextarea')">📋 复制信令</button>
+                </div>
+            </div>
+
+            <!-- 步骤2: 粘贴Offer并创建Answer -->
+            <div class="signal-box" id="step2Box">
+                <strong>步骤 2: 加入通话 (B方操作)</strong><br>
+                <small>粘贴A方发来的信令，点击"加入通话"</small><br>
+                <textarea id="remoteOfferTextarea" placeholder="粘贴对方的信令到这里"></textarea>
+                <div class="signal-buttons">
+                    <button class="btn btn-primary btn-small" onclick="createAnswer()">🎯 加入通话</button>
+                    <button class="btn btn-success btn-small" onclick="copySignal('answerTextarea')">📋 复制应答</button>
+                </div>
+                <textarea id="answerTextarea" placeholder="点击'加入通话'后，这里会生成应答信令"></textarea>
+            </div>
+
+            <!-- 步骤3: 粘贴Answer完成连接 -->
+            <div class="signal-box" id="step3Box">
+                <strong>步骤 3: 完成连接 (A方操作)</strong><br>
+                <small>粘贴B方发来的应答，点击"完成连接"</small><br>
+                <textarea id="remoteAnswerTextarea" placeholder="粘贴对方的应答信令"></textarea>
+                <div class="signal-buttons">
+                    <button class="btn btn-success btn-small" onclick="setRemoteAnswer()">✅ 完成连接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let localStream = null;
+        let peerConnection = null;
+        let username = null;
+        let audioEnabled = true;
+        let videoEnabled = true;
+
+        // WebRTC 配置
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status active ${type}`;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // 自动复制到剪贴板
+        async function autoCopy(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showStatus('✅ 已自动复制到剪贴板', 'success');
+            } catch (err) {
+                showStatus('⚠️ 复制失败，请手动复制', 'error');
+            }
+        }
+
+        // 检查环境
+        function checkEnvironment() {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+            if (protocol === 'file:') {
+                showStatus('❌ 请使用 http://localhost:8000 访问', 'error');
+                return false;
+            }
+            if (protocol === 'http:' && !isLocalhost) {
+                showStatus('❌ 请使用 localhost 访问', 'error');
+                return false;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showStatus('❌ 浏览器不支持 WebRTC', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // 初始化连接
+        async function initConnection() {
+            if (!checkEnvironment()) return;
+
+            const usernameInput = document.getElementById('usernameInput');
+            username = usernameInput.value.trim();
+
+            if (!username) {
+                showStatus('❌ 请输入用户名', 'error');
+                return;
+            }
+
+            try {
+                showStatus('⏳ 正在请求摄像头和麦克风...', 'info');
+
+                // 请求本地媒体
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: true
+                });
+
+                // 渲染本地视频
+                renderLocalVideo();
+
+                // 创建PeerConnection
+                createPeerConnection();
+
+                // 更新UI
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('controls').classList.add('active');
+                document.getElementById('signalSection').classList.add('active');
+                document.getElementById('stats').classList.add('active');
+
+                showStatus('✅ 初始化完成！请按步骤操作', 'success');
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                showStatus(`❌ 初始化失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 创建PeerConnection
+        function createPeerConnection() {
+            if (peerConnection) {
+                peerConnection.close();
+            }
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+
+            // 添加本地流
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+
+            // 监听ICE候选
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('ICE候选:', event.candidate);
+                } else {
+                    console.log('ICE收集完成');
+                }
+            };
+
+            // 监听连接状态
+            peerConnection.onconnectionstatechange = () => {
+                const state = peerConnection.connectionState;
+                document.getElementById('connState').textContent = state;
+
+                const localStatus = document.querySelector('#videoGrid .connection-status');
+                if (localStatus) {
+                    if (state === 'connected') {
+                        localStatus.textContent = '已连接';
+                        localStatus.className = 'connection-status connected';
+                        showStatus('✅ P2P连接已建立！', 'success');
+                    } else if (state === 'connecting') {
+                        localStatus.textContent = '连接中...';
+                        localStatus.className = 'connection-status connecting';
+                    } else if (state === 'disconnected' || state === 'failed') {
+                        localStatus.textContent = '已断开';
+                        localStatus.className = 'connection-status disconnected';
+                        showStatus('⚠️ 连接断开或失败', 'error');
+                    }
+                }
+            };
+
+            // 监听ICE状态
+            peerConnection.oniceconnectionstatechange = () => {
+                const state = peerConnection.iceConnectionState;
+                document.getElementById('iceState').textContent = state;
+            };
+
+            // 接收远程流
+            peerConnection.ontrack = (event) => {
+                console.log('收到远程流:', event.streams);
+                const remoteVideo = document.getElementById('remoteVideo');
+                if (remoteVideo) {
+                    remoteVideo.srcObject = event.streams[0];
+                } else {
+                    renderRemoteVideo(event.streams[0]);
+                }
+            };
+
+            // 监听带宽（每3秒更新）
+            setInterval(async () => {
+                if (peerConnection && peerConnection.connectionState === 'connected') {
+                    const stats = await peerConnection.getStats();
+                    stats.forEach(report => {
+                        if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                            const bandwidth = (report.bytesReceived / 1024 / 1024).toFixed(2);
+                            document.getElementById('bandwidth').textContent = `${bandwidth} MB`;
+                        }
+                    });
+                }
+            }, 3000);
+        }
+
+        // 渲染本地视频
+        function renderLocalVideo() {
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = '';
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.innerHTML = `
+                <div class="video-label">👤 ${username} (自己)</div>
+                <div class="connection-status disconnected">未连接</div>
+                <video id="localVideo" autoplay muted playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = document.getElementById('localVideo');
+            video.srcObject = localStream;
+
+            grid.className = 'video-grid two-columns';
+        }
+
+        // 渲染远程视频
+        function renderRemoteVideo(stream) {
+            const grid = document.getElementById('videoGrid');
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.innerHTML = `
+                <div class="video-label">👥 远程用户</div>
+                <div class="connection-status connected">已连接</div>
+                <video id="remoteVideo" autoplay playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = document.getElementById('remoteVideo');
+            video.srcObject = stream;
+
+            // 更新本地视频状态
+            const localStatus = document.querySelector('#videoGrid .video-container:first-child .connection-status');
+            if (localStatus) {
+                localStatus.textContent = '已连接';
+                localStatus.className = 'connection-status connected';
+            }
+        }
+
+        // 创建Offer
+        async function createOffer() {
+            if (!peerConnection) {
+                showStatus('❌ 请先初始化连接', 'error');
+                return;
+            }
+
+            try {
+                showStatus('⏳ 正在创建Offer...', 'info');
+
+                const offer = await peerConnection.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
+
+                await peerConnection.setLocalDescription(offer);
+
+                // 生成可分享的信令
+                const signalData = {
+                    type: 'offer',
+                    sdp: peerConnection.localDescription.sdp,
+                    username: username,
+                    timestamp: new Date().toISOString()
+                };
+
+                const signalText = btoa(JSON.stringify(signalData));
+                document.getElementById('offerTextarea').value = signalText;
+
+                // 自动复制
+                await autoCopy(signalText);
+
+                updateConnectionStatus('✅ Offer已创建并自动复制');
+                showStatus('✅ Offer创建成功！已自动复制', 'success');
+
+            } catch (error) {
+                console.error('创建Offer失败:', error);
+                showStatus(`❌ 创建失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 创建Answer
+        async function createAnswer() {
+            if (!peerConnection) {
+                showStatus('❌ 请先初始化连接', 'error');
+                return;
+            }
+
+            const remoteOfferText = document.getElementById('remoteOfferTextarea').value.trim();
+            if (!remoteOfferText) {
+                showStatus('❌ 请粘贴对方的Offer', 'error');
+                return;
+            }
+
+            try {
+                showStatus('⏳ 正在处理Offer并创建Answer...', 'info');
+
+                // 解析Offer
+                const signalData = JSON.parse(atob(remoteOfferText));
+                const remoteDescription = new RTCSessionDescription({
+                    type: 'offer',
+                    sdp: signalData.sdp
+                });
+
+                await peerConnection.setRemoteDescription(remoteDescription);
+
+                // 创建Answer
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+
+                // 生成应答信令
+                const answerData = {
+                    type: 'answer',
+                    sdp: peerConnection.localDescription.sdp,
+                    username: username,
+                    timestamp: new Date().toISOString()
+                };
+
+                const answerText = btoa(JSON.stringify(answerData));
+                document.getElementById('answerTextarea').value = answerText;
+
+                // 自动复制
+                await autoCopy(answerText);
+
+                updateConnectionStatus('✅ Answer已创建并自动复制');
+                showStatus('✅ Answer创建成功！已自动复制', 'success');
+
+            } catch (error) {
+                console.error('创建Answer失败:', error);
+                showStatus(`❌ 失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 设置远程Answer
+        async function setRemoteAnswer() {
+            if (!peerConnection) {
+                showStatus('❌ 请先初始化连接', 'error');
+                return;
+            }
+
+            const remoteAnswerText = document.getElementById('remoteAnswerTextarea').value.trim();
+            if (!remoteAnswerText) {
+                showStatus('❌ 请粘贴对方的Answer', 'error');
+                return;
+            }
+
+            try {
+                showStatus('⏳ 正在完成连接...', 'info');
+
+                // 解析Answer
+                const signalData = JSON.parse(atob(remoteAnswerText));
+                const remoteDescription = new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: signalData.sdp
+                });
+
+                await peerConnection.setRemoteDescription(remoteDescription);
+
+                updateConnectionStatus('✅ 连接已完成！等待ICE协商');
+                showStatus('✅ 连接建立成功！等待媒体流...', 'success');
+
+            } catch (error) {
+                console.error('设置Answer失败:', error);
+                showStatus(`❌ 失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 复制信令
+        async function copySignal(elementId) {
+            const textarea = document.getElementById(elementId);
+            if (!textarea.value) {
+                showStatus('❌ 没有内容可复制', 'error');
+                return;
+            }
+
+            await autoCopy(textarea.value);
+        }
+
+        // 更新连接状态
+        function updateConnectionStatus(message) {
+            // 可以在这里添加额外的UI更新
+            console.log(message);
+        }
+
+        // 切换音频
+        function toggleAudio() {
+            if (!localStream) return;
+
+            audioEnabled = !audioEnabled;
+            const audioTracks = localStream.getAudioTracks();
+            audioTracks.forEach(track => track.enabled = audioEnabled);
+
+            const btn = document.getElementById('toggleAudioBtn');
+            btn.textContent = audioEnabled ? '🔇 静音' : '🔊 取消静音';
+            btn.className = audioEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(audioEnabled ? '✅ 已取消静音' : '🔇 已静音', 'info');
+        }
+
+        // 切换视频
+        function toggleVideo() {
+            if (!localStream) return;
+
+            videoEnabled = !videoEnabled;
+            const videoTracks = localStream.getVideoTracks();
+            videoTracks.forEach(track => track.enabled = videoEnabled);
+
+            const btn = document.getElementById('toggleVideoBtn');
+            btn.textContent = videoEnabled ? '📷 关闭摄像头' : '📷 打开摄像头';
+            btn.className = videoEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(videoEnabled ? '✅ 摄像头已开启' : '❌ 摄像头已关闭', 'info');
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            // 重置UI
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = `
+                <div class="video-container">
+                    <div class="video-placeholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);color:white;font-size:16px;font-weight:600;flex-direction:column;gap:8px;">
+                        <div style="font-size:42px;">👤</div>
+                        <div>等待初始化...</div>
+                    </div>
+                </div>
+            `;
+            grid.className = 'video-grid';
+
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('controls').classList.remove('active');
+            document.getElementById('signalSection').classList.remove('active');
+            document.getElementById('stats').classList.remove('active');
+
+            // 清空信令框
+            document.getElementById('offerTextarea').value = '';
+            document.getElementById('remoteOfferTextarea').value = '';
+            document.getElementById('answerTextarea').value = '';
+            document.getElementById('remoteAnswerTextarea').value = '';
+
+            // 重置状态
+            document.getElementById('connState').textContent = '-';
+            document.getElementById('iceState').textContent = '-';
+            document.getElementById('bandwidth').textContent = '-';
+
+            showStatus('✅ 已断开连接', 'success');
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            if (peerConnection) {
+                peerConnection.close();
+            }
+        });
+    </script>
+</body>
+</html>

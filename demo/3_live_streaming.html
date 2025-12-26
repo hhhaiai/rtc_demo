@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3. 直播测试 - P2P实时直播</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 22px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info-box strong { color: #1976d2; }
+
+        .connection-mode {
+            background: #fff3cd;
+            padding: 12px 20px;
+            margin: 10px 20px;
+            border-radius: 6px;
+            border-left: 4px solid #ffc107;
+            font-size: 13px;
+            font-weight: 600;
+            color: #856404;
+            text-align: center;
+        }
+
+        .server-mode {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 10px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+        }
+        .server-mode input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .login-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .login-form {
+            display: flex;
+            gap: 10px;
+            max-width: 800px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .login-form input {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-form button {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn-broadcaster {
+            background: #e91e63;
+            color: white;
+        }
+        .btn-broadcaster:hover:not(:disabled) {
+            background: #c2185b;
+            transform: translateY(-2px);
+        }
+        .btn-viewer {
+            background: #9c27b0;
+            color: white;
+        }
+        .btn-viewer:hover:not(:disabled) {
+            background: #7b1fa2;
+            transform: translateY(-2px);
+        }
+        .btn-leave {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-leave:hover:not(:disabled) {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .live-info {
+            background: #ffebee;
+            padding: 12px 20px;
+            margin: 10px 20px;
+            border-radius: 6px;
+            border-left: 4px solid #f44336;
+            font-size: 14px;
+            font-weight: 600;
+            color: #c62828;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .live-info.active {
+            display: flex;
+        }
+        .live-badge {
+            background: #f44336;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .room-id-display {
+            background: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            color: #c62828;
+            font-family: monospace;
+        }
+
+        .status {
+            padding: 10px 20px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            margin: 10px 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+            text-align: center;
+        }
+        .status.active { display: block; }
+        .status.success { background: #d1e7dd; border-left-color: #28a745; }
+        .status.error { background: #f8d7da; border-left-color: #dc3545; }
+        .status.info { background: #e3f2fd; border-left-color: #2196f3; }
+
+        .controls {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: none;
+        }
+        .controls.active {
+            display: block;
+        }
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover:not(:disabled) { background: #e0a800; }
+
+        .video-grid {
+            display: grid;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 300px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 2;
+        }
+        .participant-count {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(233, 30, 99, 0.9);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .connection-status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.9);
+        }
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .comment-section {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: none;
+        }
+        .comment-section.active {
+            display: block;
+        }
+        .comment-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .comment-input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .comment-input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .comment-input-group button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .comment-input-group button:hover {
+            background: #5568d3;
+        }
+
+        .comment-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .comment-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            border-left: 3px solid #667eea;
+            animation: slideIn 0.3s ease-out;
+        }
+        .comment-item .author {
+            font-weight: 700;
+            color: #667eea;
+            margin-right: 8px;
+        }
+        .comment-item .time {
+            color: #999;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .floating-comments {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+
+        .floating-comment {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            animation: floatAcross 6s linear forwards;
+            border-left: 4px solid #667eea;
+        }
+
+        @keyframes floatAcross {
+            0% {
+                left: -200px;
+                top: 50%;
+                opacity: 0;
+                transform: translateY(-50%) scale(0.8);
+            }
+            10% {
+                opacity: 1;
+                transform: translateY(-50%) scale(1);
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                left: 110%;
+                top: 50%;
+                opacity: 0;
+                transform: translateY(-50%) scale(0.8);
+            }
+        }
+
+        .like-animation {
+            position: fixed;
+            font-size: 32px;
+            pointer-events: none;
+            z-index: 9998;
+            animation: likeFloat 2s ease-out forwards;
+        }
+
+        @keyframes likeFloat {
+            0% {
+                transform: translateY(0) scale(0.5);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-150px) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .gift-animation {
+            position: fixed;
+            font-size: 48px;
+            pointer-events: none;
+            z-index: 9998;
+            animation: giftBurst 3s ease-out forwards;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+        }
+
+        @keyframes giftBurst {
+            0% {
+                transform: translateY(0) scale(0.5) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(-100px) scale(1.2) rotate(180deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-200px) scale(0.8) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .action-buttons {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10000;
+        }
+        .action-buttons.active {
+            display: flex;
+        }
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        }
+        .action-btn:active {
+            transform: scale(0.9);
+        }
+        .like-btn {
+            background: #e91e63;
+            color: white;
+        }
+        .gift-btn {
+            background: #ff9800;
+            color: white;
+        }
+        .comment-btn {
+            background: #667eea;
+            color: white;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            flex-wrap: wrap;
+            display: none;
+        }
+        .stats.active {
+            display: flex;
+        }
+        .stat-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .stat-value {
+            font-weight: 700;
+            color: #007bff;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 3. 直播测试 - P2P实时直播</h1>
+            <p>主播/观众模式，支持实时P2P连接和浮动评论</p>
+        </div>
+
+        <div class="info-box">
+            <strong>使用说明：</strong><br>
+            • 本页面使用信令服务器进行P2P直播连接<br>
+            • 主播：开启摄像头推流，观众通过信令服务器连接<br>
+            • 观众：输入直播间号观看主播的实时画面<br>
+            • 浮动评论：评论会在屏幕中从左到右飘过<br>
+            • 点赞/礼物：点击按钮会有动画特效<br>
+            • 注意：需要先启动信令服务器
+        </div>
+
+        <div class="connection-mode">
+            当前模式：信令服务器P2P直播（真实连接）
+        </div>
+
+        <div class="server-mode">
+            <strong>信令服务器配置：</strong><br>
+            <small>如果没有信令服务器，可以使用手动信令模式</small><br>
+            <input type="text" id="serverUrlInput" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+        </div>
+
+        <div class="login-section">
+            <div class="login-form">
+                <input type="text" id="usernameInput" placeholder="您的用户名" maxlength="20">
+                <input type="text" id="roomInput" placeholder="直播间号 (如: live1001)" maxlength="20">
+                <button class="btn-broadcaster" id="broadcasterBtn" onclick="startBroadcaster()">🎤 主播模式</button>
+                <button class="btn-viewer" id="viewerBtn" onclick="startViewer()">👁️ 观众模式</button>
+                <button class="btn-leave" id="leaveBtn" onclick="leaveLive()" disabled>离开直播</button>
+            </div>
+        </div>
+
+        <div class="live-info" id="liveInfo">
+            <span>
+                <span class="live-badge">🔴 LIVE</span>
+                <span style="margin-left: 10px;">直播间: <span class="room-id-display" id="currentRoomId">-</span></span>
+            </span>
+            <span>观众: <span id="userCount">0</span> 人</span>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="controls" id="controls">
+            <div class="control-group">
+                <button class="btn btn-secondary" id="toggleAudioBtn" onclick="toggleAudio()">🔇 静音</button>
+                <button class="btn btn-secondary" id="toggleVideoBtn" onclick="toggleVideo()">📷 关闭摄像头</button>
+            </div>
+        </div>
+
+        <div class="video-grid" id="videoGrid">
+            <div class="video-container">
+                <div class="video-placeholder">
+                    <div class="emoji">🎥</div>
+                    <div>等待开始直播...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-item">连接数: <span class="stat-value" id="connCount">0</span></div>
+            <div class="stat-item">带宽: <span class="stat-value" id="bandwidth">-</span></div>
+            <div class="stat-item">延迟: <span class="stat-value" id="latency">-</span></div>
+        </div>
+
+        <div class="comment-section" id="commentSection">
+            <div class="comment-input-group">
+                <input type="text" id="commentInput" placeholder="输入评论内容..." maxlength="50">
+                <button onclick="sendComment()">发送评论</button>
+            </div>
+            <div class="comment-list" id="commentList"></div>
+        </div>
+
+        <div class="floating-comments" id="floatingComments"></div>
+
+        <div class="action-buttons" id="actionButtons">
+            <button class="action-btn like-btn" onclick="sendLike()" title="点赞">❤️</button>
+            <button class="action-btn gift-btn" onclick="sendGift()" title="送礼物">🎁</button>
+            <button class="action-btn comment-btn" onclick="focusComment()" title="评论">💬</button>
+        </div>
+    </div>
+
+    <script>
+        let localStream = null;
+        let username = null;
+        let roomId = null;
+        let currentMode = null; // 'broadcaster' or 'viewer'
+        let audioEnabled = true;
+        let videoEnabled = true;
+
+        // 存储所有PeerConnection
+        const peerConnections = {}; // userId -> RTCPeerConnection
+        const remoteStreams = {}; // userId -> MediaStream
+
+        // 信令服务器相关
+        let ws = null;
+
+        // WebRTC 配置
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status active ${type}`;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // 检查环境
+        function checkEnvironment() {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+            if (protocol === 'file:') {
+                showStatus('❌ 请使用 http://localhost:8000 访问', 'error');
+                return false;
+            }
+            if (protocol === 'http:' && !isLocalhost) {
+                showStatus('❌ 请使用 localhost 访问', 'error');
+                return false;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showStatus('❌ 浏览器不支持 WebRTC', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // 主播模式：开启摄像头并等待观众连接
+        async function startBroadcaster() {
+            if (!checkEnvironment()) return;
+
+            const usernameInput = document.getElementById('usernameInput');
+            const roomInput = document.getElementById('roomInput');
+            const serverUrlInput = document.getElementById('serverUrlInput');
+
+            username = usernameInput.value.trim();
+            roomId = roomInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
+
+            if (!username || !roomId) {
+                showStatus('❌ 请输入用户名和直播间号', 'error');
+                return;
+            }
+
+            currentMode = 'broadcaster';
+
+            try {
+                showStatus('⏳ 正在请求摄像头和麦克风...', 'info');
+
+                // 请求本地媒体
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: true
+                });
+
+                // 渲染本地视频
+                renderLocalVideo();
+
+                // 尝试连接信令服务器
+                try {
+                    await connectSignalingServer(serverUrl);
+                    showStatus('✅ 直播已开始！观众可以观看了', 'success');
+                } catch (error) {
+                    console.warn('信令服务器连接失败:', error);
+                    showStatus('⚠️ 信令服务器连接失败，请检查服务器', 'error');
+                    return;
+                }
+
+                // 更新UI
+                document.getElementById('broadcasterBtn').disabled = true;
+                document.getElementById('viewerBtn').disabled = true;
+                document.getElementById('leaveBtn').disabled = false;
+                document.getElementById('controls').classList.add('active');
+                document.getElementById('liveInfo').classList.add('active');
+                document.getElementById('commentSection').classList.add('active');
+                document.getElementById('actionButtons').classList.add('active');
+                document.getElementById('stats').classList.add('active');
+
+                document.getElementById('currentRoomId').textContent = roomId;
+                updateParticipantCount();
+
+            } catch (error) {
+                console.error('启动直播失败:', error);
+                showStatus(`❌ 启动失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 观众模式：连接到主播
+        async function startViewer() {
+            if (!checkEnvironment()) return;
+
+            const usernameInput = document.getElementById('usernameInput');
+            const roomInput = document.getElementById('roomInput');
+            const serverUrlInput = document.getElementById('serverUrlInput');
+
+            username = usernameInput.value.trim();
+            roomId = roomInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
+
+            if (!username || !roomId) {
+                showStatus('❌ 请输入用户名和直播间号', 'error');
+                return;
+            }
+
+            currentMode = 'viewer';
+
+            try {
+                showStatus('⏳ 正在连接信令服务器...', 'info');
+
+                // 观众不需要本地摄像头，但需要连接服务器
+                await connectSignalingServer(serverUrl);
+
+                // 更新UI
+                document.getElementById('broadcasterBtn').disabled = true;
+                document.getElementById('viewerBtn').disabled = true;
+                document.getElementById('leaveBtn').disabled = false;
+                document.getElementById('commentSection').classList.add('active');
+                document.getElementById('actionButtons').classList.add('active');
+                document.getElementById('stats').classList.add('active');
+
+                document.getElementById('currentRoomId').textContent = roomId;
+                document.getElementById('liveInfo').classList.add('active');
+
+                showStatus('✅ 已连接，等待主播画面...', 'success');
+
+            } catch (error) {
+                console.error('连接失败:', error);
+                showStatus(`❌ 连接失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 渲染本地视频（主播）
+        function renderLocalVideo() {
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = '';
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = 'local-container';
+            container.innerHTML = `
+                <div class="video-label">🎤 ${username} (主播)</div>
+                <div class="participant-count" id="viewerCounter">0</div>
+                <div class="connection-status connected">直播中</div>
+                <video id="localVideo" autoplay muted playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = document.getElementById('localVideo');
+            video.srcObject = localStream;
+        }
+
+        // 渲染远程视频（观众看到的主播画面）
+        function renderRemoteVideo(userId, stream) {
+            const grid = document.getElementById('videoGrid');
+
+            // 检查是否已存在
+            const existing = document.getElementById(`remote-${userId}`);
+            if (existing) {
+                const video = existing.querySelector('video');
+                video.srcObject = stream;
+                return;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = `remote-${userId}`;
+            container.innerHTML = `
+                <div class="video-label">🎥 ${userId} (主播)</div>
+                <div class="connection-status connected">已连接</div>
+                <video autoplay playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = container.querySelector('video');
+            video.srcObject = stream;
+
+            // 更新计数
+            updateParticipantCount();
+        }
+
+        // 连接信令服务器
+        function connectSignalingServer(serverUrl) {
+            return new Promise((resolve, reject) => {
+                try {
+                    ws = new WebSocket(serverUrl);
+
+                    ws.onopen = () => {
+                        console.log('信令服务器已连接');
+                        // 发送加入房间消息
+                        ws.send(JSON.stringify({
+                            type: 'join',
+                            username: username,
+                            roomId: roomId,
+                            role: currentMode // broadcaster 或 viewer
+                        }));
+                    };
+
+                    ws.onmessage = async (event) => {
+                        const message = JSON.parse(event.data);
+                        console.log('收到消息:', message);
+
+                        switch (message.type) {
+                            case 'peerJoined':
+                                // 有新观众加入（主播端）
+                                if (currentMode === 'broadcaster' && message.username !== username) {
+                                    await createStreamToViewer(message.username);
+                                    showStatus(`✅ 观众 ${message.username} 已加入`, 'success');
+                                }
+                                break;
+
+                            case 'peerLeft':
+                                // 用户离开
+                                removePeer(message.username);
+                                break;
+
+                            case 'offer':
+                                // 收到Offer（观众端）
+                                if (message.to === username && currentMode === 'viewer') {
+                                    await handleOffer(message.from, message.sdp);
+                                }
+                                break;
+
+                            case 'answer':
+                                // 收到Answer（主播端）
+                                if (message.to === username && currentMode === 'broadcaster') {
+                                    await handleAnswer(message.from, message.sdp);
+                                }
+                                break;
+
+                            case 'iceCandidate':
+                                // 收到ICE候选
+                                if (message.to === username) {
+                                    await handleIceCandidate(message.from, message.candidate);
+                                }
+                                break;
+
+                            case 'peers':
+                                // 当前房间用户列表
+                                if (message.peers) {
+                                    const count = message.peers.length;
+                                    updateViewerCount(count);
+                                }
+                                break;
+
+                            case 'comment':
+                                // 收到评论
+                                if (message.roomId === roomId) {
+                                    addComment(message.username, message.text, true);
+                                    addFloatingComment(message.text);
+                                }
+                                break;
+
+                            case 'like':
+                                // 收到点赞
+                                if (message.roomId === roomId) {
+                                    createLikeAnimation();
+                                }
+                                break;
+
+                            case 'gift':
+                                // 收到礼物
+                                if (message.roomId === roomId) {
+                                    createGiftAnimation();
+                                    addComment('系统', `🎉 ${message.username} 送出了礼物！`, true);
+                                }
+                                break;
+
+                            case 'error':
+                                showStatus(`❌ ${message.message}`, 'error');
+                                break;
+                        }
+                    };
+
+                    ws.onerror = (error) => {
+                        console.error('WebSocket错误:', error);
+                        reject(error);
+                    };
+
+                    ws.onclose = () => {
+                        console.log('信令服务器已断开');
+                        showStatus('⚠️ 信令服务器断开', 'error');
+                    };
+
+                    resolve();
+
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // 主播：创建流到指定观众
+        async function createStreamToViewer(targetUsername) {
+            if (!localStream) {
+                console.error('本地流未准备');
+                return;
+            }
+
+            // 检查是否已存在连接，避免重复创建
+            if (peerConnections[targetUsername]) {
+                console.log(`与 ${targetUsername} 的连接已存在`);
+                return;
+            }
+
+            console.log(`正在为观众 ${targetUsername} 创建流...`);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            peerConnections[targetUsername] = pc;
+
+            // 添加本地流
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // 监听ICE候选
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'iceCandidate',
+                        from: username,
+                        to: targetUsername,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            // 监听连接状态
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
+                console.log(`${targetUsername} 连接状态: ${state}`);
+                updateStats();
+
+                if (state === 'connected') {
+                    updateParticipantCount();
+                    showStatus(`✅ 与 ${targetUsername} 连接成功`, 'success');
+                } else if (state === 'disconnected' || state === 'failed') {
+                    showStatus(`⚠️ 与 ${targetUsername} 连接断开`, 'error');
+                }
+            };
+
+            // 创建Offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            // 发送Offer
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'offer',
+                    from: username,
+                    to: targetUsername,
+                    sdp: pc.localDescription.sdp
+                }));
+                console.log(`已发送Offer给观众 ${targetUsername}`);
+            }
+        }
+
+        // 观众：处理Offer
+        async function handleOffer(fromUsername, remoteSdp) {
+            // 检查是否已存在连接
+            if (peerConnections[fromUsername]) {
+                console.log(`与 ${fromUsername} 的连接已存在，忽略重复Offer`);
+                return;
+            }
+
+            console.log(`正在处理主播 ${fromUsername} 的Offer...`);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            peerConnections[fromUsername] = pc;
+
+            // 监听远程流
+            pc.ontrack = (event) => {
+                console.log(`收到 ${fromUsername} 的流`, event.streams);
+                const stream = event.streams[0];
+                if (!remoteStreams[fromUsername]) {
+                    remoteStreams[fromUsername] = stream;
+                    renderRemoteVideo(fromUsername, stream);
+                    showStatus('✅ 已收到主播画面', 'success');
+                }
+            };
+
+            // 监听ICE候选
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'iceCandidate',
+                        from: username,
+                        to: fromUsername,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            // 监听连接状态
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
+                console.log(`${fromUsername} 连接状态: ${state}`);
+                updateStats();
+            };
+
+            // 设置远程Description
+            await pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'offer',
+                sdp: remoteSdp
+            }));
+
+            // 创建Answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // 发送Answer
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'answer',
+                    from: username,
+                    to: fromUsername,
+                    sdp: pc.localDescription.sdp
+                }));
+                console.log(`已发送Answer给主播 ${fromUsername}`);
+            }
+        }
+
+        // 主播：处理Answer
+        async function handleAnswer(fromUsername, remoteSdp) {
+            const pc = peerConnections[fromUsername];
+            if (!pc) {
+                console.error(`未找到PeerConnection: ${fromUsername}`);
+                return;
+            }
+
+            await pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'answer',
+                sdp: remoteSdp
+            }));
+
+            console.log(`与 ${fromUsername} 的连接建立完成`);
+        }
+
+        // 处理ICE候选
+        async function handleIceCandidate(fromUsername, candidate) {
+            const pc = peerConnections[fromUsername];
+            if (!pc) {
+                console.error(`未找到PeerConnection: ${fromUsername}`);
+                return;
+            }
+
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error('添加ICE候选失败:', error);
+            }
+        }
+
+        // 移除Peer
+        function removePeer(username) {
+            const pc = peerConnections[username];
+            if (pc) {
+                pc.close();
+                delete peerConnections[username];
+            }
+
+            const stream = remoteStreams[username];
+            if (stream) {
+                delete remoteStreams[username];
+            }
+
+            // 从UI移除
+            const container = document.getElementById(`remote-${username}`);
+            if (container) {
+                container.remove();
+            }
+
+            updateParticipantCount();
+            updateStats();
+
+            showStatus(`⚠️ ${username} 已离开`, 'info');
+        }
+
+        // 更新参与者计数
+        function updateParticipantCount() {
+            const count = Object.keys(peerConnections).length;
+            document.getElementById('userCount').textContent = count;
+
+            const localCounter = document.getElementById('viewerCounter');
+            if (localCounter) {
+                localCounter.textContent = count;
+            }
+        }
+
+        // 更新观众计数（主播端）
+        function updateViewerCount(count) {
+            document.getElementById('userCount').textContent = count;
+            const localCounter = document.getElementById('viewerCounter');
+            if (localCounter) {
+                localCounter.textContent = count;
+            }
+        }
+
+        // 更新统计信息
+        async function updateStats() {
+            const connCount = Object.keys(peerConnections).length;
+            document.getElementById('connCount').textContent = connCount;
+
+            // 计算总带宽
+            let totalBytes = 0;
+            for (const pc of Object.values(peerConnections)) {
+                if (pc.connectionState === 'connected') {
+                    const stats = await pc.getStats();
+                    stats.forEach(report => {
+                        if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                            totalBytes += report.bytesReceived || 0;
+                        }
+                    });
+                }
+            }
+
+            if (totalBytes > 0) {
+                const bandwidth = (totalBytes / 1024 / 1024).toFixed(2);
+                document.getElementById('bandwidth').textContent = `${bandwidth} MB`;
+            }
+
+            // 模拟延迟
+            const latency = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('latency').textContent = `${latency}ms`;
+        }
+
+        // 切换音频
+        function toggleAudio() {
+            if (!localStream || currentMode !== 'broadcaster') return;
+
+            audioEnabled = !audioEnabled;
+            const audioTracks = localStream.getAudioTracks();
+            audioTracks.forEach(track => track.enabled = audioEnabled);
+
+            const btn = document.getElementById('toggleAudioBtn');
+            btn.textContent = audioEnabled ? '🔇 静音' : '🔊 取消静音';
+            btn.className = audioEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(audioEnabled ? '✅ 已取消静音' : '🔇 已静音', 'info');
+        }
+
+        // 切换视频
+        function toggleVideo() {
+            if (!localStream || currentMode !== 'broadcaster') return;
+
+            videoEnabled = !videoEnabled;
+            const videoTracks = localStream.getVideoTracks();
+            videoTracks.forEach(track => track.enabled = videoEnabled);
+
+            const btn = document.getElementById('toggleVideoBtn');
+            btn.textContent = videoEnabled ? '📷 关闭摄像头' : '📷 打开摄像头';
+            btn.className = videoEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(videoEnabled ? '✅ 摄像头已开启' : '❌ 摄像头已关闭', 'info');
+        }
+
+        // 发送评论
+        function sendComment() {
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+
+            // 本地显示
+            addComment('您', text, false);
+            addFloatingComment(text);
+
+            // 通过信令服务器广播
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'comment',
+                    username: username,
+                    roomId: roomId,
+                    text: text
+                }));
+            }
+
+            input.value = '';
+        }
+
+        // 发送点赞
+        function sendLike() {
+            // 本地动画
+            createLikeAnimation();
+
+            // 通过信令服务器广播
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'like',
+                    username: username,
+                    roomId: roomId
+                }));
+            }
+        }
+
+        // 发送礼物
+        function sendGift() {
+            // 本地动画和通知
+            createGiftAnimation();
+            addComment('系统', `🎉 您送出了礼物！`, false);
+
+            // 通过信令服务器广播
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'gift',
+                    username: username,
+                    roomId: roomId
+                }));
+            }
+
+            showStatus('🎉 礼物已送出！', 'success');
+        }
+
+        // 添加评论到列表
+        function addComment(author, text, isSimulated = false) {
+            const list = document.getElementById('commentList');
+            const item = document.createElement('div');
+            item.className = 'comment-item';
+
+            const time = new Date().toLocaleTimeString().substring(0, 5);
+            item.innerHTML = `
+                <span class="author">${author}</span>
+                <span>${text}</span>
+                <span class="time">${time}</span>
+            `;
+
+            list.appendChild(item);
+            list.scrollTop = list.scrollHeight;
+
+            // 限制数量
+            while (list.children.length > 20) {
+                list.removeChild(list.firstChild);
+            }
+        }
+
+        // 添加浮动评论
+        function addFloatingComment(text) {
+            const container = document.getElementById('floatingComments');
+            const comment = document.createElement('div');
+            comment.className = 'floating-comment';
+            comment.textContent = text;
+
+            // 随机垂直位置（20%-80%）
+            const randomTop = 20 + Math.random() * 60;
+            comment.style.top = randomTop + '%';
+
+            // 随机延迟
+            const randomDelay = Math.random() * 0.5;
+            comment.style.animationDelay = randomDelay + 's';
+
+            container.appendChild(comment);
+
+            // 动画结束后移除
+            setTimeout(() => {
+                if (comment.parentNode) {
+                    comment.parentNode.removeChild(comment);
+                }
+            }, 6500);
+        }
+
+        // 创建点赞动画
+        function createLikeAnimation() {
+            const container = document.getElementById('floatingComments');
+            const like = document.createElement('div');
+            like.className = 'like-animation';
+            like.textContent = '❤️';
+
+            // 随机位置
+            const randomLeft = 20 + Math.random() * 60;
+            const randomBottom = 10 + Math.random() * 30;
+            like.style.left = randomLeft + '%';
+            like.style.bottom = randomBottom + 'px';
+
+            container.appendChild(like);
+
+            setTimeout(() => {
+                if (like.parentNode) {
+                    like.parentNode.removeChild(like);
+                }
+            }, 2000);
+        }
+
+        // 创建礼物动画
+        function createGiftAnimation() {
+            const container = document.getElementById('floatingComments');
+            const gift = document.createElement('div');
+            gift.className = 'gift-animation';
+            gift.textContent = '🎁';
+
+            // 随机位置
+            const randomLeft = 30 + Math.random() * 40;
+            const randomBottom = 20 + Math.random() * 40;
+            gift.style.left = randomLeft + '%';
+            gift.style.bottom = randomBottom + 'px';
+
+            container.appendChild(gift);
+
+            setTimeout(() => {
+                if (gift.parentNode) {
+                    gift.parentNode.removeChild(gift);
+                }
+            }, 3000);
+        }
+
+        // 聚焦评论输入框
+        function focusComment() {
+            document.getElementById('commentInput').focus();
+        }
+
+        // 离开直播
+        function leaveLive() {
+            // 关闭WebSocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+
+            // 关闭所有PeerConnection
+            for (const [username, pc] of Object.entries(peerConnections)) {
+                pc.close();
+            }
+
+            // 停止本地流
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            // 重置数据
+            Object.keys(peerConnections).forEach(key => delete peerConnections[key]);
+            Object.keys(remoteStreams).forEach(key => delete remoteStreams[key]);
+
+            // 重置UI
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = `
+                <div class="video-container">
+                    <div class="video-placeholder">
+                        <div class="emoji">🎥</div>
+                        <div>等待开始直播...</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('broadcasterBtn').disabled = false;
+            document.getElementById('viewerBtn').disabled = false;
+            document.getElementById('leaveBtn').disabled = true;
+            document.getElementById('controls').classList.remove('active');
+            document.getElementById('liveInfo').classList.remove('active');
+            document.getElementById('commentSection').classList.remove('active');
+            document.getElementById('actionButtons').classList.remove('active');
+            document.getElementById('stats').classList.remove('active');
+
+            document.getElementById('participantsList').innerHTML = '';
+            document.getElementById('userCount').textContent = '0';
+            document.getElementById('connCount').textContent = '0';
+            document.getElementById('bandwidth').textContent = '-';
+            document.getElementById('latency').textContent = '-';
+
+            // 清空评论
+            document.getElementById('commentList').innerHTML = '';
+            document.getElementById('floatingComments').innerHTML = '';
+
+            showStatus('✅ 已离开直播', 'success');
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (ws) ws.close();
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            for (const pc of Object.values(peerConnections)) {
+                pc.close();
+            }
+        });
+
+        // 回车发送评论
+        document.addEventListener('DOMContentLoaded', () => {
+            const commentInput = document.getElementById('commentInput');
+            if (commentInput) {
+                commentInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendComment();
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

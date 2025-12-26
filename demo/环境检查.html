@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 环境检查工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+
+        .check-section {
+            padding: 30px;
+        }
+        .check-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #6c757d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .check-item.pass {
+            background: #d1e7dd;
+            border-left-color: #28a745;
+        }
+        .check-item.fail {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .check-item.warn {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .check-label {
+            font-weight: 600;
+            color: #333;
+        }
+        .check-status {
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-pass { background: #28a745; color: white; }
+        .status-fail { background: #dc3545; color: white; }
+        .status-warn { background: #ffc107; color: #333; }
+        .status-pending { background: #6c757d; color: white; }
+
+        .details {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+            padding-left: 10px;
+        }
+
+        .action-buttons {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; transform: translateY(-2px); }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; transform: translateY(-2px); }
+
+        .video-preview {
+            margin-top: 20px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            display: none;
+        }
+        .video-preview.active { display: block; }
+        .video-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 20px 30px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info-box strong { color: #1976d2; }
+
+        .result-box {
+            margin: 20px 30px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            display: none;
+        }
+        .result-box.success {
+            background: #d1e7dd;
+            color: #155724;
+            border: 2px solid #28a745;
+            display: block;
+        }
+        .result-box.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 2px solid #dc3545;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 WebRTC 环境检查工具</h1>
+            <p>快速诊断你的浏览器是否支持 WebRTC 视频通话</p>
+        </div>
+
+        <div class="info-box">
+            <strong>使用说明：</strong><br>
+            • 点击下方"开始检查"按钮<br>
+            • 允许摄像头权限<br>
+            • 查看检查结果<br>
+            • 如果全部通过，可以开始测试演示页面
+        </div>
+
+        <div class="check-section" id="checkList">
+            <div class="check-item" id="check-protocol">
+                <span class="check-label">访问协议检查</span>
+                <span class="check-status status-pending">等待检查</span>
+            </div>
+            <div class="details" id="details-protocol"></div>
+
+            <div class="check-item" id="check-webrtc">
+                <span class="check-label">WebRTC 支持检查</span>
+                <span class="check-status status-pending">等待检查</span>
+            </div>
+            <div class="details" id="details-webrtc"></div>
+
+            <div class="check-item" id="check-media">
+                <span class="check-label">媒体设备访问</span>
+                <span class="check-status status-pending">等待检查</span>
+            </div>
+            <div class="details" id="details-media"></div>
+
+            <div class="check-item" id="check-camera">
+                <span class="check-label">摄像头权限</span>
+                <span class="check-status status-pending">等待检查</span>
+            </div>
+            <div class="details" id="details-camera"></div>
+
+            <div class="check-item" id="check-microphone">
+                <span class="check-label">麦克风权限</span>
+                <span class="check-status status-pending">等待检查</span>
+            </div>
+            <div class="details" id="details-microphone"></div>
+        </div>
+
+        <div class="video-preview" id="videoPreview">
+            <video id="testVideo" autoplay muted playsinline></video>
+        </div>
+
+        <div class="result-box" id="resultBox"></div>
+
+        <div class="action-buttons">
+            <button class="btn btn-primary" id="startCheck" onclick="startCheck()">🔍 开始检查</button>
+            <button class="btn btn-success" id="openDemo" onclick="openDemo()" style="display:none;">🚀 打开演示页面</button>
+        </div>
+    </div>
+
+    <script>
+        let testStream = null;
+
+        function updateCheck(id, status, details = '') {
+            const item = document.getElementById(id);
+            const statusEl = item.querySelector('.check-status');
+            const detailsEl = document.getElementById('details-' + id.split('-')[1]);
+
+            item.className = 'check-item ' + status;
+
+            if (status === 'pass') {
+                statusEl.textContent = '通过';
+                statusEl.className = 'check-status status-pass';
+            } else if (status === 'fail') {
+                statusEl.textContent = '失败';
+                statusEl.className = 'check-status status-fail';
+            } else if (status === 'warn') {
+                statusEl.textContent = '警告';
+                statusEl.className = 'check-status status-warn';
+            } else {
+                statusEl.textContent = '检查中';
+                statusEl.className = 'check-status status-pending';
+            }
+
+            if (detailsEl && details) {
+                detailsEl.textContent = details;
+            }
+        }
+
+        async function startCheck() {
+            // 重置所有状态
+            document.getElementById('startCheck').disabled = true;
+            document.getElementById('resultBox').className = 'result-box';
+            document.getElementById('videoPreview').className = 'video-preview';
+
+            // 1. 检查协议
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+            if (protocol === 'file:') {
+                updateCheck('check-protocol', 'fail', '当前使用 file:// 协议，无法访问摄像头');
+                showResult('error', '❌ 失败：请使用 http://localhost:8000 访问');
+                finishCheck();
+                return;
+            } else if (protocol === 'http:' && !isLocalhost) {
+                updateCheck('check-protocol', 'warn', '当前使用非localhost的HTTP访问，可能被浏览器限制');
+            } else {
+                updateCheck('check-protocol', 'pass', `协议: ${protocol}, 主机: ${hostname}`);
+            }
+
+            // 2. 检查WebRTC支持
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                updateCheck('check-webrtc', 'fail', '浏览器不支持 WebRTC 或 getUserMedia');
+                showResult('error', '❌ 失败：浏览器不支持 WebRTC');
+                finishCheck();
+                return;
+            }
+            updateCheck('check-webrtc', 'pass', 'WebRTC API 可用');
+
+            // 3. 检查媒体设备
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                const audioDevices = devices.filter(d => d.kind === 'audioinput');
+
+                updateCheck('check-media', 'pass',
+                    `找到 ${videoDevices.length} 个摄像头, ${audioDevices.length} 个麦克风`);
+            } catch (e) {
+                updateCheck('check-media', 'warn', '无法枚举设备: ' + e.message);
+            }
+
+            // 4. 请求摄像头和麦克风
+            try {
+                updateCheck('check-camera', 'warn', '正在请求权限...');
+                updateCheck('check-microphone', 'warn', '正在请求权限...');
+
+                testStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 },
+                    audio: true
+                });
+
+                // 检查视频轨道
+                const videoTrack = testStream.getVideoTracks()[0];
+                if (videoTrack) {
+                    updateCheck('check-camera', 'pass', `摄像头正常: ${videoTrack.label}`);
+                } else {
+                    updateCheck('check-camera', 'fail', '未获取到视频轨道');
+                }
+
+                // 检查音频轨道
+                const audioTrack = testStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    updateCheck('check-microphone', 'pass', `麦克风正常: ${audioTrack.label}`);
+                } else {
+                    updateCheck('check-microphone', 'warn', '未获取到音频轨道（可能被静音）');
+                }
+
+                // 显示预览
+                const video = document.getElementById('testVideo');
+                video.srcObject = testStream;
+                document.getElementById('videoPreview').className = 'video-preview active';
+
+                showResult('success', '✅ 全部通过！可以开始测试演示页面');
+                document.getElementById('openDemo').style.display = 'inline-block';
+
+            } catch (error) {
+                console.error('媒体请求错误:', error);
+
+                if (error.name === 'NotAllowedError') {
+                    updateCheck('check-camera', 'fail', '用户拒绝了摄像头权限');
+                    updateCheck('check-microphone', 'fail', '用户拒绝了麦克风权限');
+                    showResult('error', '❌ 权限被拒绝：请允许浏览器访问摄像头');
+                } else if (error.name === 'NotFoundError') {
+                    updateCheck('check-camera', 'fail', '未找到摄像头设备');
+                    updateCheck('check-microphone', 'fail', '未找到麦克风设备');
+                    showResult('error', '❌ 未找到设备：请检查摄像头是否连接');
+                } else {
+                    updateCheck('check-camera', 'fail', error.message);
+                    updateCheck('check-microphone', 'fail', error.message);
+                    showResult('error', '❌ 错误: ' + error.message);
+                }
+            }
+
+            finishCheck();
+        }
+
+        function showResult(type, message) {
+            const resultBox = document.getElementById('resultBox');
+            resultBox.className = 'result-box ' + type;
+            resultBox.textContent = message;
+        }
+
+        function finishCheck() {
+            document.getElementById('startCheck').disabled = false;
+            document.getElementById('startCheck').textContent = '🔄 重新检查';
+
+            // 5秒后停止视频预览
+            setTimeout(() => {
+                if (testStream) {
+                    testStream.getTracks().forEach(track => track.stop());
+                    testStream = null;
+                }
+            }, 5000);
+        }
+
+        function openDemo() {
+            // 关闭当前视频流
+            if (testStream) {
+                testStream.getTracks().forEach(track => track.stop());
+                testStream = null;
+            }
+            // 打开演示页面
+            window.location.href = '1_video_call.html';
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (testStream) {
+                testStream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>

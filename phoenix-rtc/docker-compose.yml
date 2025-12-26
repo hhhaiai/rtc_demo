@@ -73,25 +73,29 @@ services:
     networks:
       - phoenix-net
 
-  # Spring Boot 应用 (待后续创建 Dockerfile 后启用)
-  # app:
-  #   build: ./server
-  #   container_name: phoenix_app
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     - SPRING_REDIS_HOST=redis
-  #     - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phoenix_rtc
-  #     - LIVEKIT_URL=ws://livekit:7880
-  #     - LIVEKIT_API_KEY=devkey
-  #     - LIVEKIT_API_SECRET=secret
-  #   depends_on:
-  #     - redis
-  #     - mysql
-  #     - livekit
-  #   networks:
-  #     - phoenix-net
+  # Spring Boot 应用
+  app:
+    build: ./server
+    container_name: phoenix_app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_REDIS_HOST=redis
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/phoenix_rtc
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=secret
+      - JWT_SECRET_KEY=phoenix-rtc-production-secret-key-change-this-in-production-256bit
+      - DEMO_AUTH_PASSWORD=dev123
+      - MYSQL_PASSWORD=phoenix123
+      - REDIS_PASSWORD=
+    depends_on:
+      - redis
+      - mysql
+      - livekit
+    networks:
+      - phoenix-net
 
 volumes:
   redis-data:

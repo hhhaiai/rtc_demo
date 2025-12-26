@@ -3,6 +3,7 @@ package com.phoenix.rtc.controller;
 import com.phoenix.rtc.config.JwtConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,11 @@ import java.util.Map;
 /**
  * 认证控制器
  * 提供 JWT Token 生成接口
+ *
+ * 修复说明:
+ * 1. 移除了硬编码密码检查
+ * 2. 使用环境变量配置的演示密码
+ * 3. 生产环境应集成真实用户系统
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -19,6 +25,9 @@ import java.util.Map;
 public class AuthController {
 
     private final JwtConfig jwtConfig;
+
+    @Value("${auth.demo-password}")
+    private String demoPassword;
 
     /**
      * 登录并获取 JWT Token
@@ -54,16 +63,13 @@ public class AuthController {
             // 这里仅作为演示框架，实际部署时必须替换为真实认证逻辑
             // 示例: User user = userService.authenticate(username, password);
 
-            // 临时演示：检查环境变量中的演示密码（仅开发环境使用）
-            String demoPassword = System.getenv("DEMO_AUTH_PASSWORD");
-            if (demoPassword != null && demoPassword.equals(password)) {
-                // 密码匹配，继续生成 Token
-            } else {
-                // 如果没有配置演示密码，或者密码不匹配
-                if (demoPassword == null) {
-                    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                        .body(Map.of("success", false, "message", "认证服务未配置，请联系管理员配置 DEMO_AUTH_PASSWORD"));
-                }
+            // 检查演示密码（从配置文件读取，支持环境变量覆盖）
+            if (demoPassword == null || demoPassword.trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("success", false, "message", "认证服务未配置，请联系管理员配置 DEMO_AUTH_PASSWORD"));
+            }
+
+            if (!demoPassword.equals(password)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "message", "用户名或密码错误"));
             }

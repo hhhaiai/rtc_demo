@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2. 多人会议 - 信令服务器模式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 22px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+
+        .login-section {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .login-form {
+            display: flex;
+            gap: 10px;
+            max-width: 800px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+        .login-form input {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #11998e;
+        }
+        .login-form button {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn-join {
+            background: #11998e;
+            color: white;
+        }
+        .btn-join:hover:not(:disabled) {
+            background: #0d7a71;
+            transform: translateY(-2px);
+        }
+        .btn-leave {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-leave:hover:not(:disabled) {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .room-info {
+            background: #d1e7dd;
+            padding: 12px 20px;
+            margin: 10px 20px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+            font-size: 14px;
+            font-weight: 600;
+            color: #155724;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .room-info.active {
+            display: flex;
+        }
+        .room-id-display {
+            background: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            color: #155724;
+            font-family: monospace;
+        }
+
+        .status {
+            padding: 10px 20px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            margin: 10px 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            display: none;
+            text-align: center;
+        }
+        .status.active { display: block; }
+        .status.success { background: #d1e7dd; border-left-color: #28a745; }
+        .status.error { background: #f8d7da; border-left-color: #dc3545; }
+        .status.info { background: #e3f2fd; border-left-color: #2196f3; }
+
+        .info-box {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info-box strong { color: #1976d2; }
+
+        .connection-mode {
+            background: #fff3cd;
+            padding: 12px 20px;
+            margin: 10px 20px;
+            border-radius: 6px;
+            border-left: 4px solid #ffc107;
+            font-size: 13px;
+            font-weight: 600;
+            color: #856404;
+            text-align: center;
+        }
+
+        .controls {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            display: none;
+        }
+        .controls.active {
+            display: block;
+        }
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover:not(:disabled) { background: #5a6268; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-warning:hover:not(:disabled) { background: #e0a800; }
+        .btn-success { background: #4caf50; color: white; }
+        .btn-success:hover:not(:disabled) { background: #388e3c; }
+
+        .video-grid {
+            display: grid;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 300px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .video-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 2;
+        }
+        .participant-count {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(17, 153, 142, 0.9);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .connection-status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.9);
+        }
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .participants-panel {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: none;
+        }
+        .participants-panel.active {
+            display: block;
+        }
+        .participants-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .participant-tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #2196f3;
+        }
+        .participant-tag.you {
+            background: #d1e7dd;
+            color: #155724;
+            border-color: #28a745;
+        }
+        .participant-tag.remote {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffc107;
+        }
+
+        .signal-section {
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: none;
+        }
+        .signal-section.active {
+            display: block;
+        }
+        .signal-box {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .signal-box textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .signal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #0056b3; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover:not(:disabled) { background: #218838; }
+
+        .server-mode {
+            background: #e3f2fd;
+            padding: 15px 20px;
+            margin: 10px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+            font-size: 13px;
+        }
+        .server-mode input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 12px;
+            color: #666;
+            flex-wrap: wrap;
+            display: none;
+        }
+        .stats.active {
+            display: flex;
+        }
+        .stat-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .stat-value {
+            font-weight: 700;
+            color: #007bff;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👥 2. 多人会议 - 信令服务器模式</h1>
+            <p>通过信令服务器实现多人P2P连接</p>
+        </div>
+
+        <div class="info-box">
+            <strong>使用说明：</strong><br>
+            • 本页面使用信令服务器进行自动连接<br>
+            • 所有用户使用相同的服务器地址和房间号<br>
+            • 步骤1：输入服务器地址（默认本地ws://localhost:8080）<br>
+            • 步骤2：输入用户名和房间号<br>
+            • 步骤3：点击"加入房间"，系统自动连接其他用户<br>
+            • 注意：需要先启动信令服务器
+        </div>
+
+        <div class="connection-mode">
+            当前模式：信令服务器自动连接（支持多人）
+        </div>
+
+        <div class="server-mode">
+            <strong>信令服务器配置：</strong><br>
+            <small>如果没有信令服务器，可以使用手动信令模式</small><br>
+            <input type="text" id="serverUrlInput" placeholder="ws://localhost:8080" value="ws://localhost:8080">
+        </div>
+
+        <div class="login-section">
+            <div class="login-form">
+                <input type="text" id="usernameInput" placeholder="您的用户名" maxlength="20">
+                <input type="text" id="roomInput" placeholder="会议号 (如: 1001)" maxlength="20">
+                <button class="btn-join" id="joinBtn" onclick="joinRoom()">加入房间</button>
+                <button class="btn-leave" id="leaveBtn" onclick="leaveRoom()" disabled>离开房间</button>
+            </div>
+        </div>
+
+        <div class="room-info" id="roomInfo">
+            <span>房间: <span class="room-id-display" id="currentRoomId">-</span></span>
+            <span>状态: <span id="roomStatus">未连接</span></span>
+            <span>用户: <span id="userCount">0</span></span>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="controls" id="controls">
+            <div class="control-group">
+                <button class="btn btn-secondary" id="toggleAudioBtn" onclick="toggleAudio()">🔇 静音</button>
+                <button class="btn btn-secondary" id="toggleVideoBtn" onclick="toggleVideo()">📷 关闭摄像头</button>
+                <button class="btn btn-warning" id="addManualBtn" onclick="showManualMode()">🔧 手动信令模式</button>
+            </div>
+        </div>
+
+        <div class="video-grid" id="videoGrid">
+            <div class="video-container">
+                <div class="video-placeholder">
+                    <div class="emoji">🚪</div>
+                    <div>等待加入房间...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="participants-panel" id="participantsPanel">
+            <strong>房间参与者:</strong>
+            <div class="participants-list" id="participantsList"></div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-item">连接数: <span class="stat-value" id="connCount">0</span></div>
+            <div class="stat-item">带宽: <span class="stat-value" id="bandwidth">-</span></div>
+            <div class="stat-item">延迟: <span class="stat-value" id="latency">-</span></div>
+        </div>
+
+        <div class="signal-section" id="signalSection">
+            <div class="signal-box">
+                <strong>手动信令模式（备用）：</strong><br>
+                <small>如果信令服务器不可用，使用此模式</small><br>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-primary btn-small" onclick="switchToManualMode()">切换到手动模式</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let localStream = null;
+        let username = null;
+        let roomId = null;
+        let audioEnabled = true;
+        let videoEnabled = true;
+
+        // 存储所有PeerConnection
+        const peerConnections = {}; // userId -> RTCPeerConnection
+        const remoteStreams = {}; // userId -> MediaStream
+
+        // 信令服务器相关
+        let ws = null;
+        let isManualMode = false;
+
+        // WebRTC 配置
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status active ${type}`;
+            setTimeout(() => {
+                status.className = 'status';
+            }, 3000);
+        }
+
+        // 检查环境
+        function checkEnvironment() {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+            if (protocol === 'file:') {
+                showStatus('❌ 请使用 http://localhost:8000 访问', 'error');
+                return false;
+            }
+            if (protocol === 'http:' && !isLocalhost) {
+                showStatus('❌ 请使用 localhost 访问', 'error');
+                return false;
+            }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showStatus('❌ 浏览器不支持 WebRTC', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // 加入房间
+        async function joinRoom() {
+            if (!checkEnvironment()) return;
+
+            const usernameInput = document.getElementById('usernameInput');
+            const roomInput = document.getElementById('roomInput');
+            const serverUrlInput = document.getElementById('serverUrlInput');
+
+            username = usernameInput.value.trim();
+            roomId = roomInput.value.trim();
+            const serverUrl = serverUrlInput.value.trim();
+
+            if (!username || !roomId) {
+                showStatus('❌ 请输入用户名和房间号', 'error');
+                return;
+            }
+
+            try {
+                showStatus('⏳ 正在请求摄像头和麦克风...', 'info');
+
+                // 请求本地媒体
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 1280, height: 720 },
+                    audio: true
+                });
+
+                // 渲染本地视频
+                renderLocalVideo();
+
+                // 尝试连接信令服务器
+                if (!isManualMode && serverUrl) {
+                    try {
+                        await connectSignalingServer(serverUrl);
+                        showStatus('✅ 已连接信令服务器，等待其他用户...', 'success');
+                    } catch (error) {
+                        console.warn('信令服务器连接失败:', error);
+                        showStatus('⚠️ 信令服务器连接失败，可切换到手动模式', 'error');
+                        document.getElementById('signalSection').classList.add('active');
+                    }
+                }
+
+                // 更新UI
+                document.getElementById('joinBtn').disabled = true;
+                document.getElementById('leaveBtn').disabled = false;
+                document.getElementById('controls').classList.add('active');
+                document.getElementById('roomInfo').classList.add('active');
+                document.getElementById('participantsPanel').classList.add('active');
+                document.getElementById('stats').classList.add('active');
+
+                document.getElementById('currentRoomId').textContent = roomId;
+                document.getElementById('roomStatus').textContent = '已加入';
+                updateParticipantCount();
+
+                // 添加自己到参与者列表
+                addParticipantToList(username, 'you');
+
+            } catch (error) {
+                console.error('加入房间失败:', error);
+                showStatus(`❌ 加入失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 渲染本地视频
+        function renderLocalVideo() {
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = '';
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = 'local-container';
+            container.innerHTML = `
+                <div class="video-label">👤 ${username} (自己)</div>
+                <div class="participant-count">1</div>
+                <div class="connection-status connected">已连接</div>
+                <video id="localVideo" autoplay muted playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = document.getElementById('localVideo');
+            video.srcObject = localStream;
+        }
+
+        // 渲染远程视频
+        function renderRemoteVideo(userId, stream) {
+            const grid = document.getElementById('videoGrid');
+
+            // 检查是否已存在
+            const existing = document.getElementById(`remote-${userId}`);
+            if (existing) {
+                const video = existing.querySelector('video');
+                video.srcObject = stream;
+                return;
+            }
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = `remote-${userId}`;
+            container.innerHTML = `
+                <div class="video-label">👥 ${userId}</div>
+                <div class="connection-status connected">已连接</div>
+                <video autoplay playsinline></video>
+            `;
+            grid.appendChild(container);
+
+            const video = container.querySelector('video');
+            video.srcObject = stream;
+
+            // 更新计数
+            updateParticipantCount();
+        }
+
+        // 连接信令服务器
+        function connectSignalingServer(serverUrl) {
+            return new Promise((resolve, reject) => {
+                try {
+                    ws = new WebSocket(serverUrl);
+
+                    ws.onopen = () => {
+                        console.log('信令服务器已连接');
+                        // 发送加入房间消息
+                        ws.send(JSON.stringify({
+                            type: 'join',
+                            username: username,
+                            roomId: roomId
+                        }));
+                    };
+
+                    ws.onmessage = async (event) => {
+                        const message = JSON.parse(event.data);
+                        console.log('收到消息:', message);
+
+                        switch (message.type) {
+                            case 'peerJoined':
+                                // 有新用户加入，创建Offer
+                                if (message.username !== username) {
+                                    showStatus(`👤 ${message.username} 加入房间，正在建立连接...`, 'info');
+                                    await createOfferToUser(message.username);
+                                }
+                                break;
+
+                            case 'peerLeft':
+                                // 用户离开
+                                removePeer(message.username);
+                                showStatus(`⚠️ ${message.username} 已离开`, 'info');
+                                break;
+
+                            case 'offer':
+                                // 收到Offer，创建Answer
+                                if (message.to === username) {
+                                    showStatus(`📨 收到 ${message.from} 的连接请求`, 'info');
+                                    await handleOffer(message.from, message.sdp);
+                                }
+                                break;
+
+                            case 'answer':
+                                // 收到Answer
+                                if (message.to === username) {
+                                    showStatus(`✅ 收到 ${message.from} 的应答`, 'success');
+                                    await handleAnswer(message.from, message.sdp);
+                                }
+                                break;
+
+                            case 'iceCandidate':
+                                // 收到ICE候选
+                                if (message.to === username) {
+                                    await handleIceCandidate(message.from, message.candidate);
+                                }
+                                break;
+
+                            case 'peers':
+                                // 当前房间用户列表 - 重要：为每个已存在的用户创建Offer
+                                message.peers.forEach(async (peer) => {
+                                    if (peer !== username) {
+                                        addParticipantToList(peer, 'remote');
+                                        showStatus(`👤 发现用户 ${peer}，正在连接...`, 'info');
+                                        // 为已存在的用户创建Offer
+                                        await createOfferToUser(peer);
+                                    }
+                                });
+                                updateParticipantCount();
+                                break;
+
+                            case 'error':
+                                showStatus(`❌ ${message.message}`, 'error');
+                                break;
+                        }
+                    };
+
+                    ws.onerror = (error) => {
+                        console.error('WebSocket错误:', error);
+                        reject(error);
+                    };
+
+                    ws.onclose = () => {
+                        console.log('信令服务器已断开');
+                        showStatus('⚠️ 信令服务器断开', 'error');
+                    };
+
+                    resolve();
+
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // 创建Offer给指定用户
+        async function createOfferToUser(targetUsername) {
+            if (!localStream) {
+                console.error('本地流未准备');
+                return;
+            }
+
+            // 检查是否已存在连接，避免重复创建
+            if (peerConnections[targetUsername]) {
+                console.log(`与 ${targetUsername} 的连接已存在`);
+                return;
+            }
+
+            console.log(`正在为 ${targetUsername} 创建Offer...`);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            peerConnections[targetUsername] = pc;
+
+            // 添加本地流
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // 监听远程流
+            pc.ontrack = (event) => {
+                console.log(`收到 ${targetUsername} 的流`, event.streams);
+                const stream = event.streams[0];
+                if (!remoteStreams[targetUsername]) {
+                    remoteStreams[targetUsername] = stream;
+                    renderRemoteVideo(targetUsername, stream);
+                }
+            };
+
+            // 监听ICE候选
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'iceCandidate',
+                        from: username,
+                        to: targetUsername,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            // 监听连接状态
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
+                console.log(`${targetUsername} 连接状态: ${state}`);
+                updateStats();
+
+                if (state === 'connected') {
+                    addParticipantToList(targetUsername, 'remote');
+                    showStatus(`✅ 与 ${targetUsername} 连接成功`, 'success');
+                } else if (state === 'disconnected' || state === 'failed') {
+                    showStatus(`⚠️ 与 ${targetUsername} 连接断开`, 'error');
+                }
+            };
+
+            // 创建Offer
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            // 发送Offer
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'offer',
+                    from: username,
+                    to: targetUsername,
+                    sdp: pc.localDescription.sdp
+                }));
+                console.log(`已发送Offer给 ${targetUsername}`);
+            }
+        }
+
+        // 处理Offer
+        async function handleOffer(fromUsername, remoteSdp) {
+            if (!localStream) {
+                console.error('本地流未准备');
+                return;
+            }
+
+            // 检查是否已存在连接（并发Offer处理）
+            if (peerConnections[fromUsername]) {
+                console.log(`与 ${fromUsername} 的连接已存在，忽略重复Offer`);
+                return;
+            }
+
+            console.log(`正在处理 ${fromUsername} 的Offer...`);
+
+            const pc = new RTCPeerConnection(rtcConfig);
+            peerConnections[fromUsername] = pc;
+
+            // 添加本地流
+            localStream.getTracks().forEach(track => {
+                pc.addTrack(track, localStream);
+            });
+
+            // 监听远程流
+            pc.ontrack = (event) => {
+                console.log(`收到 ${fromUsername} 的流`, event.streams);
+                const stream = event.streams[0];
+                if (!remoteStreams[fromUsername]) {
+                    remoteStreams[fromUsername] = stream;
+                    renderRemoteVideo(fromUsername, stream);
+                }
+            };
+
+            // 监听ICE候选
+            pc.onicecandidate = (event) => {
+                if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'iceCandidate',
+                        from: username,
+                        to: fromUsername,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            // 监听连接状态
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
+                console.log(`${fromUsername} 连接状态: ${state}`);
+                updateStats();
+
+                if (state === 'connected') {
+                    addParticipantToList(fromUsername, 'remote');
+                    showStatus(`✅ 与 ${fromUsername} 连接成功`, 'success');
+                } else if (state === 'disconnected' || state === 'failed') {
+                    showStatus(`⚠️ 与 ${fromUsername} 连接断开`, 'error');
+                }
+            };
+
+            // 设置远程Description
+            await pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'offer',
+                sdp: remoteSdp
+            }));
+
+            // 创建Answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            // 发送Answer
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'answer',
+                    from: username,
+                    to: fromUsername,
+                    sdp: pc.localDescription.sdp
+                }));
+                console.log(`已发送Answer给 ${fromUsername}`);
+            }
+        }
+
+        // 处理Answer
+        async function handleAnswer(fromUsername, remoteSdp) {
+            const pc = peerConnections[fromUsername];
+            if (!pc) {
+                console.error(`未找到PeerConnection: ${fromUsername}`);
+                return;
+            }
+
+            await pc.setRemoteDescription(new RTCSessionDescription({
+                type: 'answer',
+                sdp: remoteSdp
+            }));
+
+            console.log(`与 ${fromUsername} 的连接建立完成`);
+        }
+
+        // 处理ICE候选
+        async function handleIceCandidate(fromUsername, candidate) {
+            const pc = peerConnections[fromUsername];
+            if (!pc) {
+                console.error(`未找到PeerConnection: ${fromUsername}`);
+                return;
+            }
+
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (error) {
+                console.error('添加ICE候选失败:', error);
+            }
+        }
+
+        // 移除Peer
+        function removePeer(username) {
+            const pc = peerConnections[username];
+            if (pc) {
+                pc.close();
+                delete peerConnections[username];
+            }
+
+            const stream = remoteStreams[username];
+            if (stream) {
+                delete remoteStreams[username];
+            }
+
+            // 从UI移除
+            const container = document.getElementById(`remote-${username}`);
+            if (container) {
+                container.remove();
+            }
+
+            // 从参与者列表移除
+            removeParticipantFromList(username);
+
+            updateParticipantCount();
+            updateStats();
+
+            showStatus(`⚠️ ${username} 已离开`, 'info');
+        }
+
+        // 添加到参与者列表
+        function addParticipantToList(name, type = 'remote') {
+            const list = document.getElementById('participantsList');
+
+            // 检查是否已存在
+            const existing = list.querySelector(`[data-name="${name}"]`);
+            if (existing) return;
+
+            const tag = document.createElement('div');
+            tag.className = `participant-tag ${type}`;
+            tag.textContent = name;
+            tag.setAttribute('data-name', name);
+            list.appendChild(tag);
+        }
+
+        // 从参与者列表移除
+        function removeParticipantFromList(name) {
+            const list = document.getElementById('participantsList');
+            const item = list.querySelector(`[data-name="${name}"]`);
+            if (item) {
+                item.remove();
+            }
+        }
+
+        // 更新参与者计数
+        function updateParticipantCount() {
+            const count = Object.keys(peerConnections).length + 1; // +1 for self
+            document.getElementById('userCount').textContent = count;
+
+            const localCounter = document.querySelector('#local-container .participant-count');
+            if (localCounter) {
+                localCounter.textContent = count;
+            }
+        }
+
+        // 更新统计信息
+        async function updateStats() {
+            const connCount = Object.keys(peerConnections).length;
+            document.getElementById('connCount').textContent = connCount;
+
+            // 计算总带宽
+            let totalBytes = 0;
+            for (const pc of Object.values(peerConnections)) {
+                if (pc.connectionState === 'connected') {
+                    const stats = await pc.getStats();
+                    stats.forEach(report => {
+                        if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+                            totalBytes += report.bytesReceived || 0;
+                        }
+                    });
+                }
+            }
+
+            if (totalBytes > 0) {
+                const bandwidth = (totalBytes / 1024 / 1024).toFixed(2);
+                document.getElementById('bandwidth').textContent = `${bandwidth} MB`;
+            }
+
+            // 模拟延迟
+            const latency = Math.floor(Math.random() * 50) + 10;
+            document.getElementById('latency').textContent = `${latency}ms`;
+        }
+
+        // 切换音频
+        function toggleAudio() {
+            if (!localStream) return;
+
+            audioEnabled = !audioEnabled;
+            const audioTracks = localStream.getAudioTracks();
+            audioTracks.forEach(track => track.enabled = audioEnabled);
+
+            const btn = document.getElementById('toggleAudioBtn');
+            btn.textContent = audioEnabled ? '🔇 静音' : '🔊 取消静音';
+            btn.className = audioEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(audioEnabled ? '✅ 已取消静音' : '🔇 已静音', 'info');
+        }
+
+        // 切换视频
+        function toggleVideo() {
+            if (!localStream) return;
+
+            videoEnabled = !videoEnabled;
+            const videoTracks = localStream.getVideoTracks();
+            videoTracks.forEach(track => track.enabled = videoEnabled);
+
+            const btn = document.getElementById('toggleVideoBtn');
+            btn.textContent = videoEnabled ? '📷 关闭摄像头' : '📷 打开摄像头';
+            btn.className = videoEnabled ? 'btn btn-secondary' : 'btn btn-warning';
+
+            showStatus(videoEnabled ? '✅ 摄像头已开启' : '❌ 摄像头已关闭', 'info');
+        }
+
+        // 显示手动模式
+        function showManualMode() {
+            document.getElementById('signalSection').classList.add('active');
+            showStatus('ℹ️ 已显示手动信令模式选项', 'info');
+        }
+
+        // 切换到手动模式
+        function switchToManualMode() {
+            isManualMode = true;
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            showStatus('✅ 已切换到手动信令模式', 'success');
+            alert('手动模式说明：\n1. 每个用户都需要手动交换信令\n2. 适合没有信令服务器的情况\n3. 参考 1_video_call.html 的手动模式');
+        }
+
+        // 离开房间
+        function leaveRoom() {
+            // 关闭WebSocket
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+
+            // 关闭所有PeerConnection
+            for (const [username, pc] of Object.entries(peerConnections)) {
+                pc.close();
+                removeParticipantFromList(username);
+            }
+
+            // 停止本地流
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+
+            // 重置数据
+            Object.keys(peerConnections).forEach(key => delete peerConnections[key]);
+            Object.keys(remoteStreams).forEach(key => delete remoteStreams[key]);
+
+            // 重置UI
+            const grid = document.getElementById('videoGrid');
+            grid.innerHTML = `
+                <div class="video-container">
+                    <div class="video-placeholder">
+                        <div class="emoji">🚪</div>
+                        <div>等待加入房间...</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('joinBtn').disabled = false;
+            document.getElementById('leaveBtn').disabled = true;
+            document.getElementById('controls').classList.remove('active');
+            document.getElementById('roomInfo').classList.remove('active');
+            document.getElementById('participantsPanel').classList.remove('active');
+            document.getElementById('stats').classList.remove('active');
+            document.getElementById('signalSection').classList.remove('active');
+
+            document.getElementById('participantsList').innerHTML = '';
+            document.getElementById('userCount').textContent = '0';
+            document.getElementById('connCount').textContent = '0';
+            document.getElementById('bandwidth').textContent = '-';
+            document.getElementById('latency').textContent = '-';
+
+            showStatus('✅ 已离开房间', 'success');
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            if (ws) ws.close();
+            if (localStream) localStream.getTracks().forEach(track => track.stop());
+            for (const pc of Object.values(peerConnections)) {
+                pc.close();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -54,12 +54,21 @@ spring:
         send-interval: 10000
         receive-interval: 10000
 
-# LiveKit 配置
+# JWT 安全配置 (必须通过环境变量配置，否则启动失败)
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  expiration: 7200000  # 2小时
+
+# LiveKit 配置 (必须通过环境变量配置，否则启动失败)
 livekit:
-  url: ws://localhost:7880
+  url: ${LIVEKIT_URL:ws://localhost:7880}
   api:
-    key: devkey
-    secret: secret
+    key: ${LIVEKIT_API_KEY}
+    secret: ${LIVEKIT_API_SECRET}
+
+# 认证配置
+auth:
+  demo-password: ${DEMO_AUTH_PASSWORD:dev123}  # 开发环境默认值，生产环境必须覆盖
 
 # 日志配置
 logging:

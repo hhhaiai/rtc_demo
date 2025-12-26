@@ -36,14 +36,24 @@ spring:
         order_updates: true
         generate_statistics: true
 
+# JWT 安全配置 (生产环境必须使用强密钥)
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  expiration: 7200000  # 2小时
+
+# LiveKit 配置
 livekit:
-  url: ws://livekit-service:7880
+  url: ${LIVEKIT_URL:ws://livekit-service:7880}
   api:
     key: ${LIVEKIT_API_KEY}
     secret: ${LIVEKIT_API_SECRET}
   connection:
     timeout: 10000
     max-retries: 3
+
+# 认证配置 (生产环境应集成真实用户系统)
+auth:
+  demo-password: ${DEMO_AUTH_PASSWORD}
 
 # WebSocket 配置
 websocket:
